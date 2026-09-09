@@ -1,0 +1,199 @@
+<!-- Sub-header -->
+<div class="panel-subheader">
+  <div class="panel-subheader-left">
+    <h2 class="panel-title-text" *ngIf="vistaActiva === 'resumen'">
+      {{ esAdministrador() ? 'Panel Ejecutivo & Control General' : 'Panel de Operaciones en Campo' }}
+    </h2>
+    <h2 class="panel-title-text" *ngIf="vistaActiva === 'preferencias'">Preferencias del Sistema</h2>
+    <h2 class="panel-title-text" *ngIf="vistaActiva === 'seguridad'">Seguridad y Auditoria</h2>
+  </div>
+  <div class="panel-subheader-right">
+    <button class="btn-create-project" *ngIf="vistaActiva === 'resumen' && esAdministrador()" (click)="irAProyectos()">
+      + Gestionar Obras
+    </button>
+  </div>
+</div>
+
+<!-- 1. VISTA RESUMEN GENERAL -->
+<div class="view-panel space-y-6" *ngIf="vistaActiva === 'resumen'">
+  
+  <!-- KPI CARDS EN TIEMPO REAL -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="kpi-card bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Obras Totales</div>
+      <div class="text-3xl font-black text-gray-900 dark:text-white mt-1">{{ totalProyectos }}</div>
+      <div class="text-[11px] text-orange-600 font-semibold mt-1">Tenant Activo</div>
+    </div>
+
+    <div class="kpi-card bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">En Ejecución Activa</div>
+      <div class="text-3xl font-black text-green-600 mt-1">{{ proyectosActivos }}</div>
+      <div class="text-[11px] text-gray-400 mt-1">Personal en terreno</div>
+    </div>
+
+    <div class="kpi-card bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">En Planificación</div>
+      <div class="text-3xl font-black text-blue-600 mt-1">{{ proyectosPlanificacion }}</div>
+      <div class="text-[11px] text-gray-400 mt-1">Cotizaciones y permisos</div>
+    </div>
+
+    <div class="kpi-card bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+      <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Obras Concluidas</div>
+      <div class="text-3xl font-black text-gray-600 dark:text-gray-300 mt-1">{{ proyectosFinalizados }}</div>
+      <div class="text-[11px] text-gray-400 mt-1">Listas para entrega</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: CHARTS AND INDICATORS -->
+  <div class="grid-2-cols">
+    <!-- Card Chart 1 -->
+    <div class="dashboard-card">
+      <div class="card-header">
+        <h3 class="card-title">Avance Fisico de Obra (Bid Win-Loss)</h3>
+        <span class="card-tag">Ultimos 12 meses</span>
+      </div>
+      <div class="chart-mockup">
+        <div class="bar-chart-container">
+          <div class="bar-column">
+            <div class="bar-segment won" style="height: 60%;"></div>
+            <div class="bar-segment lost" style="height: 25%;"></div>
+            <span class="bar-label">Q1 '26</span>
+          </div>
+          <div class="bar-column">
+            <div class="bar-segment won" style="height: 70%;"></div>
+            <div class="bar-segment lost" style="height: 15%;"></div>
+            <span class="bar-label">Q2 '26</span>
+          </div>
+          <div class="bar-column">
+            <div class="bar-segment won" style="height: 45%;"></div>
+            <div class="bar-segment lost" style="height: 40%;"></div>
+            <span class="bar-label">Q3 '26</span>
+          </div>
+          <div class="bar-column">
+            <div class="bar-segment won" style="height: 80%;"></div>
+            <div class="bar-segment lost" style="height: 10%;"></div>
+            <span class="bar-label">Q4 '26</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card Chart 2 -->
+    <div class="dashboard-card">
+      <div class="card-header">
+        <h3 class="card-title">Horas de Mano de Obra (Manpower Hours)</h3>
+        <span class="card-tag">Ultimos 30 dias</span>
+      </div>
+      <div class="chart-mockup">
+        <svg viewBox="0 0 400 150" class="svg-chart">
+          <defs>
+            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#ea580c" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#ea580c" stop-opacity="0.0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 0 100 Q 80 40 160 80 T 320 20 L 400 60 L 400 150 L 0 150 Z" fill="url(#chartGrad)"/>
+          <path d="M 0 100 Q 80 40 160 80 T 320 20 L 400 60" fill="none" stroke="#ea580c" stroke-width="3"/>
+          <circle cx="320" cy="20" r="5" fill="#ea580c"/>
+        </svg>
+        <div class="chart-tooltip">70 Horas Registradas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: PROYECTOS RECIENTES EN EL PANEL -->
+  <div class="dashboard-card">
+    <div class="card-header">
+      <h3 class="card-title">Obras y Proyectos Recientes</h3>
+      <button (click)="irAProyectos()" class="text-xs font-bold text-orange-600 hover:underline">Ver todos &rarr;</button>
+    </div>
+    
+    <div class="overflow-x-auto mt-2">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="text-gray-400 uppercase font-bold border-b border-gray-100 dark:border-slate-800 pb-2">
+            <th class="py-2">Código</th>
+            <th class="py-2">Nombre</th>
+            <th class="py-2">Tipo</th>
+            <th class="py-2">Estado</th>
+            <th class="py-2">Ubicación</th>
+            <th class="py-2 text-right">Acción</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50 dark:divide-slate-800/50">
+          <tr *ngFor="let p of proyectos.slice(0, 5)" class="hover:bg-gray-50 dark:hover:bg-slate-800/30 cursor-pointer" (click)="verProyecto(p.id_obra)">
+            <td class="py-3 font-mono font-bold text-orange-600">{{ p.codigo }}</td>
+            <td class="py-3 font-bold text-gray-800 dark:text-white">{{ p.nombre }}</td>
+            <td class="py-3 text-gray-500">{{ p.tipo_obra_nombre }}</td>
+            <td class="py-3">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase"
+                    [ngClass]="{
+                      'bg-green-100 text-green-700': p.estado_obra === 'ACTIVO',
+                      'bg-blue-100 text-blue-700': p.estado_obra === 'PLANIFICACION',
+                      'bg-amber-100 text-amber-700': p.estado_obra === 'PAUSADO',
+                      'bg-gray-100 text-gray-700': p.estado_obra === 'FINALIZADO'
+                    }">
+                {{ p.estado_obra }}
+              </span>
+            </td>
+            <td class="py-3 text-gray-500">{{ p.zona || p.ubicacion || 'Santa Cruz' }}</td>
+            <td class="py-3 text-right">
+              <button (click)="verProyecto(p.id_obra); $event.stopPropagation()" class="text-blue-600 font-bold hover:underline">
+                Ficha &rarr;
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="proyectos.length === 0">
+            <td colspan="6" class="py-6 text-center text-gray-400">No hay proyectos registrados aún.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- 2. VISTA PREFERENCIAS -->
+<div class="view-panel space-y-6" *ngIf="vistaActiva === 'preferencias'">
+  <div class="dashboard-card">
+    <div class="card-header">
+      <h3 class="card-title">Configuracion General del Entorno</h3>
+    </div>
+    <div class="pref-options-list">
+      <div class="pref-item">
+        <div class="pref-text">
+          <strong>Modo Oscuro</strong>
+          <p>Activa la interfaz con fondo oscuro para menor fatiga visual</p>
+        </div>
+        <button class="toggle-theme-btn" (click)="alternarModoOscuro()">
+          {{ modoOscuro ? 'Desactivar Modo Oscuro' : 'Activar Modo Oscuro' }}
+        </button>
+      </div>
+      <div class="pref-item">
+        <div class="pref-text">
+          <strong>Idioma del Sistema</strong>
+          <p>Espanol (Bolivia - Santa Cruz)</p>
+        </div>
+        <span class="badge-active">Por Defecto</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. VISTA SEGURIDAD -->
+<div class="view-panel space-y-6" *ngIf="vistaActiva === 'seguridad'">
+  <div class="dashboard-card">
+    <div class="card-header">
+      <h3 class="card-title">Dispositivos y Sesiones Conectadas</h3>
+    </div>
+    <div class="space-y-4">
+      <div *ngFor="let d of dispositivosConocidos" class="device-item flex justify-between items-center bg-gray-50 dark:bg-slate-800 p-4 rounded-xl">
+        <div>
+          <h4 class="font-bold">{{ d.navegador }}</h4>
+          <span class="text-xs text-gray-400 font-mono">{{ d.hash }}</span>
+        </div>
+        <span class="badge-active">Sesion Actual</span>
+      </div>
+    </div>
+  </div>
+</div>

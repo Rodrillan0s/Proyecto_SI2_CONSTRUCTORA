@@ -1,0 +1,75 @@
+import { Component, OnInit, inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth';
+
+@Component({
+  selector: 'app-home',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './home.html',
+  styleUrl: './home.css'
+})
+export class HomeComponent implements OnInit {
+  
+  private authService = inject(AuthService);
+  private router = inject(Router);
+  private platformId = inject(PLATFORM_ID);
+
+  usuarioActual: any = null;
+  modoOscuro: boolean = false;
+
+  esAdministrador(): boolean {
+    return ['ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA'].includes(this.usuarioActual?.nombre_rol);
+  }
+
+  // METODO AL INICIAR LA PAGINA
+  ngOnInit() {
+    if (isPlatformBrowser(this.platformId)) {
+      this.usuarioActual = this.authService.obtenerUsuario();
+      
+      // Si el token expiró, limpiamos la sesión local
+      if (this.usuarioActual && this.authService.tokenExpirado()) {
+        this.authService.cerrarSesion();
+        this.usuarioActual = null;
+      }
+
+      // Redirección si ya está autenticado con sesión válida
+      if (this.usuarioActual) {
+        const destino = this.usuarioActual.nombre_rol === 'CLIENTE' ? '/main_cliente' : '/panel';
+        this.router.navigate([destino]);
+        return;
+      }
+
+      // VERIFICAR PREFERENCIA DE MODO OSCURO
+      if (localStorage.getItem('tema_sistema') === 'dark') {
+        this.modoOscuro = true;
+        document.documentElement.classList.add('dark');
+      }
+    }
+  }
+
+  // METODO PARA ALTERNAR EL MODO OSCURO
+  alternarModoOscuro() {
+    this.modoOscuro = !this.modoOscuro;
+    if (this.modoOscuro) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('tema_sistema', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('tema_sistema', 'light');
+    }
+  }
+
+  // METODO PARA NAVEGAR A ALGUN MODULO
+  navegarA(ruta: string) {
+    this.router.navigate([ruta]);
+  }
+
+  // METODO PARA CERRAR SESION
+  cerrarSesion() {
+    this.authService.cerrarSesion();
+    this.usuarioActual = null;
+    this.router.navigate(['/login']);
+  }
+}

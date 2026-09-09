@@ -1,0 +1,16 @@
+import os
+import uvicorn
+from app import create_app
+
+# Instanciamos la aplicación
+app = create_app()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+
+    uvicorn.run(
+        "run:app",
+        host="0.0.0.0",
+        port=port,
+        reload=True
+    )
