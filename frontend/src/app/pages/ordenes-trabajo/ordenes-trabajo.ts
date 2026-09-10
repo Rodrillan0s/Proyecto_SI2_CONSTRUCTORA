@@ -5,8 +5,10 @@ import {
   ChangeDetectorRef,
   NgZone,
   PLATFORM_ID,
-  OnDestroy
+  OnDestroy,
+  DestroyRef
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -42,9 +44,11 @@ export class OrdenesTrabajoComponent implements OnInit, OnDestroy {
   private cdr = inject(ChangeDetectorRef);
   private ngZone = inject(NgZone);
   private platformId = inject(PLATFORM_ID);
+  private destroyRef = inject(DestroyRef);
 
   ordenes: OrdenTrabajo[] = [];
   ordenesFiltradas: OrdenTrabajo[] = [];
+  empresaActiva: any = null;
 
   ordenSeleccionada: OrdenTrabajo | null = null;
 
@@ -73,7 +77,12 @@ export class OrdenesTrabajoComponent implements OnInit, OnDestroy {
   private timeoutMensajes: any;
 
   ngOnInit(): void {
-    this.cargarDatos();
+    this.authService.empresaActiva$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((empresa) => {
+        this.empresaActiva = empresa;
+        this.cargarDatos();
+      });
   }
 
   ngOnDestroy(): void {
@@ -82,11 +91,16 @@ export class OrdenesTrabajoComponent implements OnInit, OnDestroy {
     }
   }
 
+  esVistaGlobal(): boolean {
+    return this.authService.esVistaGlobal();
+  }
+
   cargarDatos(): void {
     this.cargando = true;
     this.mensajeError = '';
+    const idEmpresa = this.authService.obtenerIdEmpresaActiva() || undefined;
 
-    this.ordenesTrabajoService.listarOrdenesTrabajo().subscribe({
+    this.ordenesTrabajoService.listarOrdenesTrabajo(idEmpresa).subscribe({
       next: (respuesta) => {
         this.ngZone.run(() => {
           this.ordenes = respuesta.data || [];
@@ -131,6 +145,7 @@ export class OrdenesTrabajoComponent implements OnInit, OnDestroy {
         String(orden.id_obra).includes(texto) ||
         (orden.codigo || '').toLowerCase().includes(texto) ||
         (orden.nombre || '').toLowerCase().includes(texto) ||
+        (orden.nombre_empresa || '').toLowerCase().includes(texto) ||
         (orden.tipo_trab || '').toLowerCase().includes(texto);
 
       const coincideEstado =

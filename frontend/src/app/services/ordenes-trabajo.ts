@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth';
@@ -9,6 +9,8 @@ export interface OrdenTrabajo {
   id_obra: number;
   codigo?: string;
   nombre?: string;
+  id_empresa?: number;
+  nombre_empresa?: string;
   tipo_trab?: string;
   cuadrilla?: number;
   estado?: string;
@@ -74,14 +76,23 @@ export class OrdenesTrabajoService {
       : new HttpHeaders();
   }
 
- listarOrdenesTrabajo(): Observable<RespuestaApiOrdenesTrabajo> {
-  return this.http.get<RespuestaApiOrdenesTrabajo>(
-    `${this.apiUrl}/api/ordenes-trabajo/`,
-    {
-      headers: this.getHeaders()
+  listarOrdenesTrabajo(id_empresa?: number, id_obra?: number): Observable<RespuestaApiOrdenesTrabajo> {
+    let params = new HttpParams();
+    if (id_empresa) {
+      params = params.set('id_empresa', id_empresa.toString());
     }
-  );
-}
+    if (id_obra) {
+      params = params.set('id_obra', id_obra.toString());
+    }
+
+    return this.http.get<RespuestaApiOrdenesTrabajo>(
+      `${this.apiUrl}/api/ordenes-trabajo/`,
+      {
+        headers: this.getHeaders(),
+        params
+      }
+    );
+  }
 
   obtenerOrdenTrabajo(orden_nro: number): Observable<OrdenTrabajo> {
     return this.http.get<OrdenTrabajo>(

@@ -24,6 +24,25 @@
 
   </div>
 
+  <!-- BADGE CONTEXTO EMPRESA ACTIVA -->
+  <div *ngIf="empresaActiva" class="flex items-center justify-between px-4 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs mb-6">
+    <div class="flex items-center gap-2">
+      <span class="font-bold text-amber-800 dark:text-amber-400">🏢 Órdenes de trabajo de:</span>
+      <span class="font-bold text-slate-900 dark:text-white">{{ empresaActiva.nombre_empresa }}</span>
+      <span class="text-slate-500 dark:text-slate-400 font-mono">(ID: {{ empresaActiva.id_empresa }})</span>
+    </div>
+    <span class="font-bold text-amber-700 dark:text-amber-300">{{ ordenesFiltradas.length }} orden(es) registrada(s)</span>
+  </div>
+
+  <!-- BADGE CONTEXTO VISTA GLOBAL -->
+  <div *ngIf="!empresaActiva && esVistaGlobal()" class="flex items-center justify-between px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs mb-6">
+    <div class="flex items-center gap-2">
+      <span class="font-bold text-blue-700 dark:text-blue-400">🌐 Vista Global:</span>
+      <span class="text-slate-700 dark:text-slate-300">Consolidado de órdenes de trabajo de todas las empresas</span>
+    </div>
+    <span class="font-bold text-blue-700 dark:text-blue-300">{{ ordenesFiltradas.length }} orden(es) en total</span>
+  </div>
+
 
   <!-- ESTADÍSTICAS -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -303,6 +322,10 @@
               Obra
             </th>
 
+            <th *ngIf="esVistaGlobal()">
+              Empresa
+            </th>
+
             <th>
               Tipo de trabajo
             </th>
@@ -362,6 +385,16 @@
                 </p>
 
               </div>
+
+            </td>
+
+
+            <!-- EMPRESA (VISTA GLOBAL) -->
+            <td *ngIf="esVistaGlobal()">
+
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300">
+                🏢 {{ orden.nombre_empresa || 'Empresa #' + orden.id_empresa }}
+              </span>
 
             </td>
 
@@ -511,6 +544,18 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
 
+      <div class="detail-item" *ngIf="ordenSeleccionada.nombre_empresa">
+
+        <span>
+          Empresa
+        </span>
+
+        <strong>
+          {{ ordenSeleccionada.nombre_empresa }}
+        </strong>
+
+      </div>
+
       <div class="detail-item">
 
         <span>
@@ -518,7 +563,7 @@
         </span>
 
         <strong>
-          {{ ordenSeleccionada.nombre || 'Sin nombre' }}
+          {{ ordenSeleccionada.nombre_empresa ? ordenSeleccionada.nombre : (ordenSeleccionada.nombre || 'Sin nombre') }}
         </strong>
 
       </div>

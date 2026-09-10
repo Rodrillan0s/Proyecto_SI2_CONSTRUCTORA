@@ -1,7 +1,13 @@
 from app.classes.postgres import PostgreSQL
 
 
-def listar_ordenes_trabajo_fn(id_usuario: int):
+def listar_ordenes_trabajo_fn(
+    id_usuario: int,
+    rol: str = '',
+    id_empresa: int = None,
+    id_empresa_token: int = None,
+    id_obra: int = None
+):
     db = PostgreSQL()
     db.create_connection()
 
@@ -12,6 +18,8 @@ def listar_ordenes_trabajo_fn(id_usuario: int):
                 ot.id_obra,
                 o.codigo,
                 o.nombre,
+                o.id_empresa,
+                e.nombre_empresa,
                 ot.tipo_trab,
                 ot.cuadrilla,
                 ot.estado,
@@ -19,17 +27,45 @@ def listar_ordenes_trabajo_fn(id_usuario: int):
                 ot.fecha_fin,
                 ot.observacion
             FROM obras.t_orden_trabajo ot
-            INNER JOIN obras.t_orden_trabajo_usuario otu
-                ON otu.id_orden_trabajo = ot.orden_nro
             INNER JOIN obras.t_obra o
                 ON o.id_obra = ot.id_obra
-            WHERE otu.id_usuario = %s
-            ORDER BY ot.orden_nro DESC;
+            LEFT JOIN obras.t_empresa e
+                ON e.id_empresa = o.id_empresa
         """
+        condiciones = []
+        params = []
+
+        if rol == 'ADMINISTRADOR':
+            if id_empresa:
+                condiciones.append("o.id_empresa = %s")
+                params.append(id_empresa)
+        elif rol in ('ADMINISTRADOR_EMPRESA', 'JEFE_DE_OBRA', 'SUPERVISOR_OBRA'):
+            empresa_filtro = id_empresa_token or id_empresa
+            if empresa_filtro:
+                condiciones.append("o.id_empresa = %s")
+                params.append(empresa_filtro)
+        else:
+            condiciones.append("""
+                EXISTS (
+                    SELECT 1 FROM obras.t_orden_trabajo_usuario otu
+                    WHERE otu.id_orden_trabajo = ot.orden_nro
+                      AND otu.id_usuario = %s
+                )
+            """)
+            params.append(id_usuario)
+
+        if id_obra:
+            condiciones.append("ot.id_obra = %s")
+            params.append(id_obra)
+
+        if condiciones:
+            query += " WHERE " + " AND ".join(condiciones)
+
+        query += " ORDER BY ot.orden_nro DESC;"
 
         resultado = db.execute_query(
             query,
-            (id_usuario,),
+            tuple(params),
             fetchall=True
         )
 
@@ -38,6 +74,8 @@ def listar_ordenes_trabajo_fn(id_usuario: int):
             "id_obra",
             "codigo",
             "nombre",
+            "id_empresa",
+            "nombre_empresa",
             "tipo_trab",
             "cuadrilla",
             "estado",
@@ -68,7 +106,9 @@ def listar_ordenes_trabajo_fn(id_usuario: int):
 
 def obtener_orden_trabajo_fn(
     orden_nro: int,
-    id_usuario: int
+    id_usuario: int,
+    rol: str = '',
+    id_empresa_token: int = None
 ):
     db = PostgreSQL()
     db.create_connection()
@@ -80,6 +120,8 @@ def obtener_orden_trabajo_fn(
                 ot.id_obra,
                 o.codigo,
                 o.nombre,
+                o.id_empresa,
+                e.nombre_empresa,
                 ot.tipo_trab,
                 ot.cuadrilla,
                 ot.estado,
@@ -87,24 +129,40 @@ def obtener_orden_trabajo_fn(
                 ot.fecha_fin,
                 ot.observacion
             FROM obras.t_orden_trabajo ot
-            INNER JOIN obras.t_orden_trabajo_usuario otu
-                ON otu.id_orden_trabajo = ot.orden_nro
             INNER JOIN obras.t_obra o
                 ON o.id_obra = ot.id_obra
+            LEFT JOIN obras.t_empresa e
+                ON e.id_empresa = o.id_empresa
             WHERE ot.orden_nro = %s
-              AND otu.id_usuario = %s;
         """
+        params = [orden_nro]
+
+        if rol == 'ADMINISTRADOR':
+            pass
+        elif rol in ('ADMINISTRADOR_EMPRESA', 'JEFE_DE_OBRA', 'SUPERVISOR_OBRA'):
+            if id_empresa_token:
+                query += " AND o.id_empresa = %s"
+                params.append(id_empresa_token)
+        else:
+            query += """
+                AND EXISTS (
+                    SELECT 1 FROM obras.t_orden_trabajo_usuario otu
+                    WHERE otu.id_orden_trabajo = ot.orden_nro
+                      AND otu.id_usuario = %s
+                )
+            """
+            params.append(id_usuario)
 
         resultado = db.execute_query(
             query,
-            (orden_nro, id_usuario),
+            tuple(params),
             fetchone=True
         )
 
         if not resultado:
             return {
                 "success": False,
-                "error": "La orden no existe o no está asignada al usuario."
+                "error": "La orden no existe o no tiene permisos para visualizarla."
             }
 
         columnas = [
@@ -112,6 +170,8 @@ def obtener_orden_trabajo_fn(
             "id_obra",
             "codigo",
             "nombre",
+            "id_empresa",
+            "nombre_empresa",
             "tipo_trab",
             "cuadrilla",
             "estado",
@@ -243,7 +303,9 @@ def actualizar_orden_trabajo_fn(
     fecha_inicio,
     fecha_fin,
     observacion: str,
-    id_usuario: int
+    id_usuario: int,
+    rol: str = '',
+    id_empresa_token: int = None
 ):
     db = PostgreSQL()
     db.create_connection()
@@ -259,27 +321,46 @@ def actualizar_orden_trabajo_fn(
                 fecha_fin = %s,
                 observacion = %s
             WHERE ot.orden_nro = %s
-              AND EXISTS (
-                  SELECT 1
-                  FROM obras.t_orden_trabajo_usuario otu
-                  WHERE otu.id_orden_trabajo = ot.orden_nro
-                    AND otu.id_usuario = %s
-              )
-            RETURNING ot.orden_nro;
         """
+        params = [
+            tipo_trab,
+            cuadrilla,
+            estado,
+            fecha_inicio,
+            fecha_fin,
+            observacion,
+            orden_nro
+        ]
+
+        if rol == 'ADMINISTRADOR':
+            pass
+        elif rol in ('ADMINISTRADOR_EMPRESA', 'JEFE_DE_OBRA', 'SUPERVISOR_OBRA'):
+            if id_empresa_token:
+                query += """
+                    AND EXISTS (
+                        SELECT 1
+                        FROM obras.t_obra o
+                        WHERE o.id_obra = ot.id_obra
+                          AND o.id_empresa = %s
+                    )
+                """
+                params.append(id_empresa_token)
+        else:
+            query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM obras.t_orden_trabajo_usuario otu
+                    WHERE otu.id_orden_trabajo = ot.orden_nro
+                      AND otu.id_usuario = %s
+                )
+            """
+            params.append(id_usuario)
+
+        query += " RETURNING ot.orden_nro;"
 
         resultado = db.execute_query(
             query,
-            (
-                tipo_trab,
-                cuadrilla,
-                estado,
-                fecha_inicio,
-                fecha_fin,
-                observacion,
-                orden_nro,
-                id_usuario
-            ),
+            tuple(params),
             fetchone=True,
             commit=True
         )
@@ -292,7 +373,7 @@ def actualizar_orden_trabajo_fn(
 
         return {
             "success": False,
-            "error": "La orden no existe o no está asignada al usuario."
+            "error": "La orden no existe o no tiene permisos para modificarla."
         }
 
     except Exception as e:
@@ -307,7 +388,9 @@ def actualizar_orden_trabajo_fn(
 
 def eliminar_orden_trabajo_fn(
     orden_nro: int,
-    id_usuario: int
+    id_usuario: int,
+    rol: str = '',
+    id_empresa_token: int = None
 ):
     db = PostgreSQL()
     db.create_connection()
@@ -317,21 +400,38 @@ def eliminar_orden_trabajo_fn(
             UPDATE obras.t_orden_trabajo ot
             SET estado = 'CANCELADO'
             WHERE ot.orden_nro = %s
-              AND EXISTS (
-                  SELECT 1
-                  FROM obras.t_orden_trabajo_usuario otu
-                  WHERE otu.id_orden_trabajo = ot.orden_nro
-                    AND otu.id_usuario = %s
-              )
-            RETURNING ot.orden_nro, ot.estado;
         """
+        params = [orden_nro]
+
+        if rol == 'ADMINISTRADOR':
+            pass
+        elif rol in ('ADMINISTRADOR_EMPRESA', 'JEFE_DE_OBRA', 'SUPERVISOR_OBRA'):
+            if id_empresa_token:
+                query += """
+                    AND EXISTS (
+                        SELECT 1
+                        FROM obras.t_obra o
+                        WHERE o.id_obra = ot.id_obra
+                          AND o.id_empresa = %s
+                    )
+                """
+                params.append(id_empresa_token)
+        else:
+            query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM obras.t_orden_trabajo_usuario otu
+                    WHERE otu.id_orden_trabajo = ot.orden_nro
+                      AND otu.id_usuario = %s
+                )
+            """
+            params.append(id_usuario)
+
+        query += " RETURNING ot.orden_nro, ot.estado;"
 
         resultado = db.execute_query(
             query,
-            (
-                orden_nro,
-                id_usuario
-            ),
+            tuple(params),
             fetchone=True,
             commit=True
         )
@@ -345,7 +445,7 @@ def eliminar_orden_trabajo_fn(
 
         return {
             "success": False,
-            "error": "La orden no existe o no está asignada al usuario."
+            "error": "La orden no existe o no tiene permisos para cancelarla."
         }
 
     except Exception as e:
@@ -361,7 +461,9 @@ def eliminar_orden_trabajo_fn(
 def actualizar_estado_orden_trabajo_fn(
     orden_nro: int,
     estado: str,
-    id_usuario: int
+    id_usuario: int,
+    rol: str = '',
+    id_empresa_token: int = None
 ):
     db = PostgreSQL()
     db.create_connection()
@@ -371,22 +473,38 @@ def actualizar_estado_orden_trabajo_fn(
             UPDATE obras.t_orden_trabajo ot
             SET estado = %s
             WHERE ot.orden_nro = %s
-              AND EXISTS (
-                  SELECT 1
-                  FROM obras.t_orden_trabajo_usuario otu
-                  WHERE otu.id_orden_trabajo = ot.orden_nro
-                    AND otu.id_usuario = %s
-              )
-            RETURNING ot.orden_nro, ot.estado;
         """
+        params = [estado, orden_nro]
+
+        if rol == 'ADMINISTRADOR':
+            pass
+        elif rol in ('ADMINISTRADOR_EMPRESA', 'JEFE_DE_OBRA', 'SUPERVISOR_OBRA'):
+            if id_empresa_token:
+                query += """
+                    AND EXISTS (
+                        SELECT 1
+                        FROM obras.t_obra o
+                        WHERE o.id_obra = ot.id_obra
+                          AND o.id_empresa = %s
+                    )
+                """
+                params.append(id_empresa_token)
+        else:
+            query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM obras.t_orden_trabajo_usuario otu
+                    WHERE otu.id_orden_trabajo = ot.orden_nro
+                      AND otu.id_usuario = %s
+                )
+            """
+            params.append(id_usuario)
+
+        query += " RETURNING ot.orden_nro, ot.estado;"
 
         resultado = db.execute_query(
             query,
-            (
-                estado,
-                orden_nro,
-                id_usuario
-            ),
+            tuple(params),
             fetchone=True,
             commit=True
         )
@@ -400,7 +518,7 @@ def actualizar_estado_orden_trabajo_fn(
 
         return {
             "success": False,
-            "error": "La orden no existe o no está asignada al usuario."
+            "error": "La orden no existe o no tiene permisos para modificar su estado."
         }
 
     except Exception as e:
@@ -415,7 +533,9 @@ def actualizar_estado_orden_trabajo_fn(
 
 def listar_historial_orden_trabajo_fn(
     orden_nro: int,
-    id_usuario: int
+    id_usuario: int,
+    rol: str = '',
+    id_empresa_token: int = None
 ):
     db = PostgreSQL()
     db.create_connection()
@@ -427,6 +547,8 @@ def listar_historial_orden_trabajo_fn(
                 ot.id_obra,
                 o.codigo,
                 o.nombre,
+                o.id_empresa,
+                e.nombre_empresa,
                 ot.tipo_trab,
                 ot.cuadrilla,
                 ot.estado,
@@ -436,16 +558,34 @@ def listar_historial_orden_trabajo_fn(
             FROM obras.t_orden_trabajo ot
             INNER JOIN obras.t_obra o
                 ON o.id_obra = ot.id_obra
-            INNER JOIN obras.t_orden_trabajo_usuario otu
-                ON otu.id_orden_trabajo = ot.orden_nro
+            LEFT JOIN obras.t_empresa e
+                ON e.id_empresa = o.id_empresa
             WHERE ot.orden_nro = %s
-              AND otu.id_usuario = %s
-            ORDER BY ot.orden_nro DESC;
         """
+        params = [orden_nro]
+
+        if rol == 'ADMINISTRADOR':
+            pass
+        elif rol in ('ADMINISTRADOR_EMPRESA', 'JEFE_DE_OBRA', 'SUPERVISOR_OBRA'):
+            if id_empresa_token:
+                query += " AND o.id_empresa = %s"
+                params.append(id_empresa_token)
+        else:
+            query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM obras.t_orden_trabajo_usuario otu
+                    WHERE otu.id_orden_trabajo = ot.orden_nro
+                      AND otu.id_usuario = %s
+                )
+            """
+            params.append(id_usuario)
+
+        query += " ORDER BY ot.orden_nro DESC;"
 
         resultado = db.execute_query(
             query,
-            (orden_nro, id_usuario),
+            tuple(params),
             fetchall=True
         )
 
@@ -454,6 +594,8 @@ def listar_historial_orden_trabajo_fn(
             "id_obra",
             "codigo",
             "nombre",
+            "id_empresa",
+            "nombre_empresa",
             "tipo_trab",
             "cuadrilla",
             "estado",

@@ -5,13 +5,25 @@ from app.repos.orden_Trabajo_repos import (
     asignar_responsable_orden_trabajo_fn,
     eliminar_responsable_orden_trabajo_fn
 )
-def listar_ordenes_trabajo(token_data: dict) -> dict:
+def listar_ordenes_trabajo(
+    token_data: dict,
+    id_empresa: int = None,
+    id_obra: int = None
+) -> dict:
     id_usuario = token_data.get('nro_usuario')
+    rol = token_data.get('nombre_rol') or ''
+    id_empresa_token = token_data.get('id_empresa')
 
     if not id_usuario:
         raise ValueError("No se pudo identificar al usuario autenticado.")
 
-    res = orden_Trabajo_repos.listar_ordenes_trabajo_fn(id_usuario)
+    res = orden_Trabajo_repos.listar_ordenes_trabajo_fn(
+        id_usuario=id_usuario,
+        rol=rol,
+        id_empresa=id_empresa,
+        id_empresa_token=id_empresa_token,
+        id_obra=id_obra
+    )
 
     if not res.get('success'):
         raise ValueError(
@@ -27,13 +39,17 @@ def obtener_orden_trabajo(
 ) -> dict:
 
     id_usuario = token_data.get('nro_usuario')
+    rol = token_data.get('nombre_rol') or ''
+    id_empresa_token = token_data.get('id_empresa')
 
     if not id_usuario:
         raise ValueError("No se pudo identificar al usuario autenticado.")
 
     res = orden_Trabajo_repos.obtener_orden_trabajo_fn(
-        orden_nro,
-        id_usuario
+        orden_nro=orden_nro,
+        id_usuario=id_usuario,
+        rol=rol,
+        id_empresa_token=id_empresa_token
     )
 
     if not res.get('success'):
@@ -114,6 +130,8 @@ def actualizar_orden_trabajo(
 ) -> dict:
 
     id_usuario = token_data.get('nro_usuario')
+    rol = token_data.get('nombre_rol') or ''
+    id_empresa_token = token_data.get('id_empresa')
 
     if not id_usuario:
         raise ValueError("No se pudo identificar al usuario autenticado.")
@@ -137,7 +155,9 @@ def actualizar_orden_trabajo(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin or None,
         observacion=observacion or None,
-        id_usuario=id_usuario
+        id_usuario=id_usuario,
+        rol=rol,
+        id_empresa_token=id_empresa_token
     )
 
     if not res.get('success'):
@@ -167,13 +187,17 @@ def eliminar_orden_trabajo(
 ) -> dict:
 
     id_usuario = token_data.get('nro_usuario')
+    rol = token_data.get('nombre_rol') or ''
+    id_empresa_token = token_data.get('id_empresa')
 
     if not id_usuario:
         raise ValueError("No se pudo identificar al usuario autenticado.")
 
     res = orden_Trabajo_repos.eliminar_orden_trabajo_fn(
-        orden_nro,
-        id_usuario
+        orden_nro=orden_nro,
+        id_usuario=id_usuario,
+        rol=rol,
+        id_empresa_token=id_empresa_token
     )
 
     if not res.get('success'):
@@ -204,6 +228,8 @@ def actualizar_estado_orden_trabajo(
 ) -> dict:
 
     id_usuario = token_data.get('nro_usuario')
+    rol = token_data.get('nombre_rol') or ''
+    id_empresa_token = token_data.get('id_empresa')
 
     if not id_usuario:
         raise ValueError("No se pudo identificar al usuario autenticado.")
@@ -216,7 +242,9 @@ def actualizar_estado_orden_trabajo(
     res = orden_Trabajo_repos.actualizar_estado_orden_trabajo_fn(
         orden_nro=orden_nro,
         estado=estado,
-        id_usuario=id_usuario
+        id_usuario=id_usuario,
+        rol=rol,
+        id_empresa_token=id_empresa_token
     )
 
     if not res.get('success'):
@@ -245,13 +273,17 @@ def listar_historial_orden_trabajo(
 ) -> dict:
 
     id_usuario = token_data.get('nro_usuario')
+    rol = token_data.get('nombre_rol') or ''
+    id_empresa_token = token_data.get('id_empresa')
 
     if not id_usuario:
         raise ValueError("No se pudo identificar al usuario autenticado.")
 
     res = orden_Trabajo_repos.listar_historial_orden_trabajo_fn(
-        orden_nro,
-        id_usuario
+        orden_nro=orden_nro,
+        id_usuario=id_usuario,
+        rol=rol,
+        id_empresa_token=id_empresa_token
     )
 
     if not res.get('success'):

@@ -12,10 +12,16 @@ router = APIRouter(
 
 @router.get("/")
 def get_ordenes_trabajo(
+    id_empresa: int = None,
+    id_obra: int = None,
     token_data: dict = Depends(exigir_permiso("Visualizar_ordenes_trabajo"))
 ):
     try:
-        return orden_Trabajo_services.listar_ordenes_trabajo(token_data)
+        return orden_Trabajo_services.listar_ordenes_trabajo(
+            token_data,
+            id_empresa=id_empresa,
+            id_obra=id_obra
+        )
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
