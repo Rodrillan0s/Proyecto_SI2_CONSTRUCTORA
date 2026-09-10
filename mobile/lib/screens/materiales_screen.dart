@@ -467,6 +467,182 @@ class _MaterialesScreenState extends State<MaterialesScreen> {
               _buildDetalleRow('Empresa:', nombreEmpresa),
 
             const SizedBox(height: 16),
+
+            Builder(
+              builder: (buttonContext) {
+                final auth = Provider.of<AuthProvider>(buttonContext, listen: false);
+                final puedeModificar = auth.esAdminGlobal || auth.hasPermission('Modificar_materiales');
+                if (!puedeModificar) return const SizedBox.shrink();
+
+                return SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.edit_note_rounded, size: 20),
+                    label: const Text('Modificar Stock Actual', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _mostrarDialogoModificarStock(context, m, stock, unidad);
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarDialogoModificarStock(
+    BuildContext context,
+    Map<String, dynamic> m,
+    String stockActual,
+    String unidad,
+  ) {
+    final stockCtrl = TextEditingController(text: stockActual);
+    final formKey = GlobalKey<FormState>();
+    bool guardando = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.edit_rounded, color: AppTheme.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Modificar Stock', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  m['nombre_material']?.toString() ?? 'Material',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                Text(
+                  'Código: ${m['codigo'] ?? ""}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: stockCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Nuevo Stock Actual ($unidad) *',
+                    hintText: 'Ej. 50.00',
+                    prefixIcon: const Icon(Icons.inventory_2_outlined, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El stock actual es obligatorio';
+                    }
+                    final parsed = double.tryParse(value.trim());
+                    if (parsed == null || parsed < 0) {
+                      return 'Ingrese un número válido mayor o igual a 0';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: guardando ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: guardando
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      setDialogState(() => guardando = true);
+
+                      final idMaterial = m['id_material'] is int
+                          ? m['id_material'] as int
+                          : int.tryParse(m['id_material']?.toString() ?? '0') ?? 0;
+                      final nuevoStock = double.parse(stockCtrl.text.trim());
+
+                      // Obtenemos los datos completos del backend para asegurar la integridad
+                      final fullData = await _materialService.obtenerMaterial(idMaterial) ?? m;
+
+                      final idCategoria = fullData['categoria'] is Map
+                          ? (fullData['categoria']['id_categoria'] as int? ?? 0)
+                          : int.tryParse(fullData['id_categoria']?.toString() ?? '0') ?? 0;
+
+                      final idUnidad = fullData['unidad_medida'] is Map
+                          ? (fullData['unidad_medida']['id_unidad_medida'] as int? ?? 0)
+                          : int.tryParse(fullData['id_unidad_medida']?.toString() ?? '0') ?? 0;
+
+                      final payload = <String, dynamic>{
+                        'codigo': fullData['codigo'],
+                        'nombre_material': fullData['nombre_material'],
+                        'descripcion': fullData['descripcion'],
+                        'id_categoria': idCategoria,
+                        'id_unidad_medida': idUnidad,
+                        'precio': fullData['precio'] != null ? double.tryParse(fullData['precio'].toString()) : null,
+                        'stock_minimo': double.tryParse(fullData['stock_minimo']?.toString() ?? '0') ?? 0.0,
+                        'stock_actual': nuevoStock,
+                        'caracteristicas': fullData['caracteristicas'] ?? [],
+                      };
+
+                      final exito = await _materialService.modificarMaterial(idMaterial, payload);
+
+                      if (dialogCtx.mounted) {
+                        Navigator.pop(dialogCtx);
+                      }
+
+                      if (!mounted) return;
+
+                      if (exito) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Stock actualizado exitosamente.'),
+                            backgroundColor: AppTheme.success,
+                          ),
+                        );
+                        _cargarMateriales();
+                      } else {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('No se pudo actualizar el stock del material.'),
+                            backgroundColor: AppTheme.error,
+                          ),
+                        );
+                      }
+                    },
+              child: guardando
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Guardar'),
+            ),
           ],
         ),
       ),

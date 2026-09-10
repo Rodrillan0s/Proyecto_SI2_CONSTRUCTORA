@@ -93,7 +93,11 @@ def registrar(data, token, ip="unknown"):
 
 
 def modificar(material_id, data, token, ip="unknown"):
-    empresa_target = _empresa(token, data.get("id_empresa"), obligatorio=False)
+    from app.utils.security import es_admin_sistema
+    if es_admin_sistema(token):
+        empresa_target = None
+    else:
+        empresa_target = _empresa(token, data.get("id_empresa"), obligatorio=False)
     data_para_validar = {k: v for k, v in data.items() if k != "id_empresa"}
     if not material_repos.obtener(empresa_target, material_id): raise MaterialError("Material no encontrado.",404)
     clean = _validar(data_para_validar, False)
@@ -115,7 +119,11 @@ def listar(token, q=None, id_categoria=None, estado=None, stock_bajo=None, page=
 
 
 def detalle(material_id, token, id_empresa=None):
-    empresa_target = _empresa(token, id_empresa, obligatorio=False)
+    from app.utils.security import es_admin_sistema
+    if es_admin_sistema(token):
+        empresa_target = None
+    else:
+        empresa_target = _empresa(token, id_empresa, obligatorio=False)
     data = material_repos.obtener(empresa_target,material_id)
     if not data: raise MaterialError("Material no encontrado.",404)
     return {"success":True,"data":data}
@@ -124,7 +132,11 @@ def detalle(material_id, token, id_empresa=None):
 def cambiar_estado(material_id, estado, token, ip="unknown", id_empresa=None):
     estado = str(estado or "").strip().upper()
     if estado not in ESTADOS: raise MaterialError("Estado inválido.")
-    empresa_target = _empresa(token, id_empresa, obligatorio=False)
+    from app.utils.security import es_admin_sistema
+    if es_admin_sistema(token):
+        empresa_target = None
+    else:
+        empresa_target = _empresa(token, id_empresa, obligatorio=False)
     if not material_repos.cambiar_estado(empresa_target,material_id,estado): raise MaterialError("Material no encontrado.",404)
     accion = "DESACTIVAR_MATERIAL" if estado == "INACTIVO" else "REACTIVAR_MATERIAL"
     _log(token,accion,f"Material {material_id} cambiado a {estado}.",ip)

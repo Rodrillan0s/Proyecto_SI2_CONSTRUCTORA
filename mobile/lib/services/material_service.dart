@@ -38,4 +38,26 @@ class MaterialService {
       return [];
     }
   }
+
+  Future<Map<String, dynamic>?> obtenerMaterial(int idMaterial) async {
+    try {
+      final response = await _dio.get('/api/materiales/$idMaterial');
+      final data = response.data;
+      if (data != null && data['success'] == true && data['data'] != null) {
+        return Map<String, dynamic>.from(data['data'] as Map);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> modificarMaterial(int idMaterial, Map<String, dynamic> datos) async {
+    try {
+      final response = await _dio.put('/api/materiales/$idMaterial', data: datos);
+      return response.data?['success'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
 }
