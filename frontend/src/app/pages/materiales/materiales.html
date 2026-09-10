@@ -115,7 +115,6 @@
             </div>
             <div><label for="unidad-form">Unidad de medida *</label><select id="unidad-form" name="id_unidad_medida" [(ngModel)]="form.id_unidad_medida" required><option [ngValue]="0" disabled>Selecciona una unidad</option><option *ngFor="let u of unidades" [ngValue]="u.id_unidad_medida">{{ u.nombre }} ({{ u.abreviatura }})</option></select></div>
             <div><label for="precio">Precio</label><input id="precio" name="precio" type="number" min="0" step="0.01" [(ngModel)]="form.precio"></div>
-            <div *ngIf="editando"><label>Stock actual</label><div class="readonly-value">{{ form.stock_actual }} <span>Solo lectura</span></div></div>
           </div></fieldset>
           <fieldset><div class="legend-row"><legend>Características</legend><button type="button" class="btn-link" (click)="agregarCaracteristica()">＋ Agregar característica</button></div>
             <p class="hint" *ngIf="form.caracteristicas.length === 0">Agrega datos como marca, peso o presentación.</p>
@@ -123,6 +122,7 @@
           </fieldset>
           <fieldset><legend>Información de almacén</legend><div class="form-grid">
             <div *ngIf="!editando"><label for="cantidad-inicial">Cantidad inicial *</label><input id="cantidad-inicial" name="cantidad_inicial" type="number" min="0" step="0.01" [(ngModel)]="form.cantidad_inicial" required><p class="hint">Cantidad disponible al registrar el material.</p></div>
+            <div *ngIf="editando"><label for="stock-actual">Stock actual *</label><input id="stock-actual" name="stock_actual" type="number" min="0" step="0.01" [(ngModel)]="form.stock_actual" required><p class="hint">Existencias físicas disponibles en almacén.</p></div>
             <div><label for="stock-minimo">Stock mínimo *</label><input id="stock-minimo" name="stock_minimo" type="number" min="0" step="0.01" [(ngModel)]="form.stock_minimo" required><p class="hint">Umbral para identificar materiales con bajo stock.</p></div>
             <div *ngIf="!editando"><label for="fecha-ingreso">Fecha de ingreso *</label><input id="fecha-ingreso" name="fecha_ingreso" type="date" [(ngModel)]="form.fecha_ingreso" required></div>
           </div></fieldset>

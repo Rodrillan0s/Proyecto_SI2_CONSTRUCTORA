@@ -154,7 +154,10 @@ def actualizar(id_empresa, id_material, data):
         db.execute_query("DELETE FROM obras.t_material_caracteristica WHERE id_material=%s", (id_material,))
         for item in data["caracteristicas"]:
             db.execute_query("INSERT INTO obras.t_material_caracteristica(id_material,nombre,valor) VALUES(%s,%s,%s)", (id_material,item["nombre"],item["valor"]))
-        db.execute_query("UPDATE obras.t_materiales_almacen SET stock_minimo=%s WHERE id_material=%s", (data["stock_minimo"],id_material))
+        if "stock_actual" in data and data["stock_actual"] is not None:
+            db.execute_query("UPDATE obras.t_materiales_almacen SET stock_minimo=%s, cantidad_actual=%s WHERE id_material=%s", (data["stock_minimo"], data["stock_actual"], id_material))
+        else:
+            db.execute_query("UPDATE obras.t_materiales_almacen SET stock_minimo=%s WHERE id_material=%s", (data["stock_minimo"], id_material))
         db.conn.commit(); return True
     except errors.UniqueViolation as exc:
         db.conn.rollback(); raise MaterialConflictError("El código ya existe en su empresa.") from exc

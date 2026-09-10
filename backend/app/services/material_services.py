@@ -5,7 +5,7 @@ from app.repos import bitacora_repos, material_repos
 
 
 ESTADOS = {"ACTIVO", "INACTIVO"}
-PROHIBIDOS_EDICION = {"cantidad_actual", "cantidad_inicial", "id_material", "id_empresa", "estado"}
+PROHIBIDOS_EDICION = {"cantidad_inicial", "id_material", "id_empresa", "estado"}
 
 
 class MaterialError(ValueError):
@@ -71,6 +71,11 @@ def _validar(data, creando):
         result["cantidad_inicial"] = _numero(data.get("cantidad_inicial"), "La cantidad inicial")
         try: result["fecha_ingreso"] = date.fromisoformat(str(data.get("fecha_ingreso")))
         except (ValueError, TypeError): raise MaterialError("La fecha de ingreso debe tener formato YYYY-MM-DD.")
+    else:
+        if "stock_actual" in data and data.get("stock_actual") is not None:
+            result["stock_actual"] = _numero(data.get("stock_actual"), "El stock actual")
+        elif "cantidad_actual" in data and data.get("cantidad_actual") is not None:
+            result["stock_actual"] = _numero(data.get("cantidad_actual"), "El stock actual")
     return result
 
 
@@ -89,8 +94,9 @@ def registrar(data, token, ip="unknown"):
 
 def modificar(material_id, data, token, ip="unknown"):
     empresa_target = _empresa(token, data.get("id_empresa"), obligatorio=False)
+    data_para_validar = {k: v for k, v in data.items() if k != "id_empresa"}
     if not material_repos.obtener(empresa_target, material_id): raise MaterialError("Material no encontrado.",404)
-    clean = _validar(data, False)
+    clean = _validar(data_para_validar, False)
     try: saved = material_repos.actualizar(empresa_target, material_id, clean)
     except material_repos.MaterialConflictError as exc: raise MaterialError(str(exc),409)
     if not saved: raise MaterialError("Material no encontrado.",404)

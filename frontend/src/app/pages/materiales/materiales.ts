@@ -192,6 +192,7 @@ export class MaterialesComponent implements OnInit {
       descripcion: this.form.descripcion?.trim() || null, id_categoria: +this.form.id_categoria,
       id_unidad_medida: +this.form.id_unidad_medida, precio: this.form.precio === null ? null : +this.form.precio,
       stock_minimo: +this.form.stock_minimo,
+      stock_actual: this.editando && this.form.stock_actual !== undefined && this.form.stock_actual !== null ? +this.form.stock_actual : undefined,
       caracteristicas: this.form.caracteristicas.map(c => ({ nombre: c.nombre.trim(), valor: c.valor.trim() })) };
     const idEmpresa = this.auth.obtenerIdEmpresaActiva() || this.auth.obtenerUsuario()?.id_empresa;
     const request = this.editando && this.form.id_material
@@ -220,6 +221,9 @@ export class MaterialesComponent implements OnInit {
     if (!(+this.form.id_unidad_medida > 0)) return 'La unidad de medida es obligatoria.';
     if (!this.editando && (!this.form.fecha_ingreso || Number.isNaN(Date.parse(this.form.fecha_ingreso)))) return 'La fecha de ingreso es obligatoria y debe ser válida.';
     if (!this.editando && +this.form.cantidad_inicial < 0) return 'La cantidad inicial no puede ser negativa.';
+    if (this.editando && (this.form.stock_actual === undefined || this.form.stock_actual === null || Number.isNaN(+this.form.stock_actual) || +this.form.stock_actual < 0)) {
+      return 'El stock actual no puede ser negativo ni estar vacío.';
+    }
     if (+this.form.stock_minimo < 0) return 'El stock mínimo no puede ser negativo.';
     if (this.form.precio !== null && +this.form.precio < 0) return 'El precio no puede ser negativo.';
     if (this.form.caracteristicas.some(c => !c.nombre.trim() || !c.valor.trim())) return 'Cada característica debe tener nombre y valor.';

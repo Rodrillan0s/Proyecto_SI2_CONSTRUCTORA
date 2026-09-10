@@ -43,7 +43,9 @@ export interface MaterialCreatePayload {
   id_empresa?: number;
 }
 
-export type MaterialUpdatePayload = Omit<MaterialCreatePayload, 'cantidad_inicial' | 'fecha_ingreso'>;
+export type MaterialUpdatePayload = Omit<MaterialCreatePayload, 'cantidad_inicial' | 'fecha_ingreso'> & {
+  stock_actual?: number;
+};
 export interface MaterialPagination { page: number; limit: number; total: number; total_pages: number; }
 export interface MaterialListResponse { success: boolean; data: Material[]; pagination: MaterialPagination; }
 export interface ApiResponse<T> { success: boolean; data: T; message?: string; }
