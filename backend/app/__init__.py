@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[
             "http://localhost:4200",
-            "https://obratec.onrender.com"
+            "https://obratech-kjfu.onrender.com"
         ],
         allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:[0-9]+)?$",
         allow_credentials=True,
