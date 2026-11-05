@@ -197,9 +197,12 @@ def post_solicitar_contacto(
     _enforce_rate_limit(request, 'contacto')
     empresa = _resolver_y_autorizar_empresa(empresa_ref, request)
     try:
+        token_data = _extraer_token_opcional(request)
+        id_usuario_sol = token_data.get('nro_usuario') if isinstance(token_data, dict) else None
         res = lead_service.registrar_solicitud_contacto(
             id_empresa=empresa['id_empresa'],
             solicitud=data,
+            id_usuario_solicitante=id_usuario_sol,
         )
         return {
             'success': True,

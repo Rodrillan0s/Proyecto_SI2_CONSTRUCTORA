@@ -54,7 +54,8 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[
             "http://localhost:4200",
-            "https://obratech-kjfu.onrender.com"
+            "https://obratech-kjfu.onrender.com",
+            "https://obratech-y040.onrender.com",
         ],
         allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:[0-9]+)?$",
         allow_credentials=True,
@@ -106,6 +107,3 @@ def create_app() -> FastAPI:
     app.include_router(commercial_routes.router)
     app.include_router(documentos_routes.router, prefix='/api/documentos-tecnicos') 
     return app
-
-
-###esto es una prueba 
