@@ -386,57 +386,59 @@ export class DocumentosTecnicosComponent implements OnInit {
   }
 
   abrirHistorial(documento: DocumentoTecnico): void {
-    this.documentoSeleccionado = documento;
-    this.historialVersiones = [];
-    this.cargandoHistorial = true;
-    this.mensajeError = '';
-    this.modal = 'historial';
+  this.documentoSeleccionado = documento;
+  this.historialVersiones = [];
+  this.cargandoHistorial = true;
+  this.mensajeError = '';
+  this.modal = 'historial';
 
-    this.service.historial(documento.id_documento)
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => {
-          this.cargandoHistorial = false;
-          this.cdr.detectChanges();
-        })
-      )
-      .subscribe({
-        next: (res: any) => {
-          this.historialVersiones = res?.data || [];
-        },
-        error: (error) => {
+  this.service.historial(documento.id_documento)
+    .pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => {
+        this.cargandoHistorial = false;
+        this.cdr.detectChanges();
+      })
+    )
+    .subscribe({
+      next: (res) => {
+        this.historialVersiones = res.data?.versiones || [];
+      },
+      error: (error) => {
+        this.mostrarError(
+          error?.error?.detail || 'No se pudo cargar el historial.'
+        );
+      }
+    });
+}
+
+ descargarDocumento(documento: DocumentoTecnico): void {
+  this.service.historial(documento.id_documento)
+    .pipe(takeUntilDestroyed(this.destroyRef))
+    .subscribe({
+      next: (res) => {
+        const versiones = res.data?.versiones || [];
+
+        const versionActual = versiones.find(
+          version => version.numero_version === documento.version_actual
+        );
+
+        if (!versionActual) {
           this.mostrarError(
-            error?.error?.detail || 'No se pudo cargar el historial.'
+            'No se encontró la versión vigente del documento.'
           );
+          return;
         }
-      });
-  }
 
-  descargarDocumento(documento: DocumentoTecnico): void {
-    this.service.historial(documento.id_documento)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (res: any) => {
-          const versiones: VersionDocumento[] = res?.data || [];
-
-          const versionActual = versiones.find(
-            version => version.numero_version === documento.version_actual
-          );
-
-          if (!versionActual) {
-            this.mostrarError('No se encontró la versión vigente del documento.');
-            return;
-          }
-
-          this.descargarArchivo(documento.id_documento, versionActual);
-        },
-        error: (error) => {
-          this.mostrarError(
-            error?.error?.detail || 'No se pudo obtener la versión del documento.'
-          );
-        }
-      });
-  }
+        this.descargarArchivo(documento.id_documento, versionActual);
+      },
+      error: (error) => {
+        this.mostrarError(
+          error?.error?.detail || 'No se pudo obtener la versión del documento.'
+        );
+      }
+    });
+}
 
   descargar(version: VersionDocumento): void {
     if (!this.documentoSeleccionado) {
