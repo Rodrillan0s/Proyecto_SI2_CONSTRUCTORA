@@ -261,7 +261,13 @@ def actualizar_estado_obra(id_obra: int, nuevo_estado: str, token_data: dict, cl
     if not id_empresa:
         raise ValueError("El ID de la empresa es obligatorio.")
 
-    res = obra_repos.actualizar_estado_obra_sp(id_obra, id_empresa, nuevo_estado)
+    if nuevo_estado == 'FINALIZADO':
+        from app.services import gastos_operativos_services
+        # El administrador global ya resolvio la empresa real de esta obra.
+        token_costos = {**token_data, 'id_empresa': id_empresa}
+        res = gastos_operativos_services.finalizar_obra(id_obra, token_costos)
+    else:
+        res = obra_repos.actualizar_estado_obra_sp(id_obra, id_empresa, nuevo_estado)
     if not res.get('success'):
         raise ValueError(res.get('error', "No se pudo cambiar el estado del proyecto."))
 
@@ -348,3 +354,41 @@ def retirar_responsable(id_obra: int, id_usuario: int, token_data: dict, client_
 
 def obtener_tipos_proyecto():
     return obra_repos.obtener_tipos_obra()
+
+
+def _empresa_personal(id_obra: int, token_data: dict):
+    es_global = token_data.get('nombre_rol') == 'ADMINISTRADOR'
+    id_empresa = token_data.get('id_empresa')
+    if not es_global and not id_empresa:
+        raise ValueError('El ID de la empresa es obligatorio.')
+    obra = obra_repos.obtener_obra_detalle_sp(id_obra, None if es_global else id_empresa)
+    if not obra.get('success'):
+        raise ValueError('El proyecto no existe o no pertenece a su empresa.')
+    empresa_obra = obra['data']['id_empresa']
+    if not empresa_obra or (not es_global and empresa_obra != id_empresa):
+        raise ValueError('El proyecto no pertenece a su empresa.')
+    return empresa_obra
+
+
+def listar_personal(id_obra: int, token_data: dict, candidatos: bool = False):
+    empresa = _empresa_personal(id_obra, token_data)
+    return {'success': True, 'data': obra_repos.listar_personal(id_obra, empresa, candidatos)}
+
+
+def asignar_personal(id_obra: int, id_usuario: int, token_data: dict, client_ip: str = 'unknown'):
+    if token_data.get('nombre_rol') not in ('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA'):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail='Solo los administradores pueden asignar personal a la obra.')
+    if type(id_usuario) is not int or id_usuario <= 0:
+        raise ValueError('El campo id_usuario debe ser un entero positivo.')
+    empresa = _empresa_personal(id_obra, token_data)
+    creado = obra_repos.asignar_personal(id_obra, id_usuario, empresa)
+    if creado:
+        bitacora_repos.registrar_bitacora(
+            id_usuario=token_data.get('nro_usuario'), modulo='PROYECTOS',
+            accion='ASIGNAR_PERSONAL',
+            descripcion=f'Personal {id_usuario} asignado al proyecto {id_obra}.',
+            ip=client_ip, estado='EXITOSO'
+        )
+    return {'success': True, 'asignado': creado,
+            'message': 'Personal asignado correctamente.' if creado else 'El trabajador ya pertenece a la obra.'}

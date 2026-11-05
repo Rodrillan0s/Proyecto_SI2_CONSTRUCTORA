@@ -11,6 +11,7 @@ ENV/
 # =========================
 .env
 .env.*
+!.env.example
 *.secret
 
 # =========================
@@ -62,3 +63,8 @@ ehthumbs.db
 build/
 dist/
 *.egg-info/
+
+# =========================
+# Archivos subidos por usuarios (CU19 - evidencias de incidencias)
+# =========================
+uploads/
