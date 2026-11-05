@@ -48,6 +48,7 @@ def registrar_solicitud_contacto(
     id_empresa: int,
     solicitud: LeadContactRequest,
     contexto_conversacion: dict | None = None,
+    id_usuario_solicitante: int | None = None,
 ) -> dict:
     """
     Valida y registra formalmente el interés del cliente potencial en el CRM de la empresa.
@@ -102,6 +103,30 @@ def registrar_solicitud_contacto(
         resumen_interaccion=notas_consolidadas,
     )
 
+    try:
+        from app.services import notificaciones_services
+        medio_str = telefono or email or ''
+        cuerpo_notif = f"Prospecto {nombre} ({medio_str}) registrado en CRM (#CRM-{resultado_crm['id_cliente']})."
+        if solicitud.notas:
+            cuerpo_notif += f" Nota: {solicitud.notas.strip()}"
+        notificaciones_services.emitir_notificacion_push_empresa(
+            titulo=f"Nuevo prospecto comercial: {nombre}",
+            cuerpo=cuerpo_notif,
+            tipo_referencia="CRM_PROSPECTO",
+            id_empresa=id_empresa,
+            nro_referencia=resultado_crm['id_cliente'],
+            roles_destino=[
+                "ADMINISTRADOR",
+                "ADMINISTRADOR_EMPRESA",
+                "JEFE DE OBRA",
+                "SUPERVISOR_OBRA",
+                "CLIENTE",
+            ],
+            usuarios_especificos=[id_usuario_solicitante] if id_usuario_solicitante else None,
+        )
+    except Exception as exc:
+        print(f"[WARN] Error al emitir push de prospecto CRM: {exc}")
+
     return {
         'registrado': True,
         'id_cliente_crm': resultado_crm['id_cliente'],
@@ -116,4 +141,3 @@ def registrar_solicitud_contacto(
             f"contigo a la brevedad vía {'WhatsApp/teléfono ' + telefono if telefono else 'correo ' + email}."
         ),
     }
-
