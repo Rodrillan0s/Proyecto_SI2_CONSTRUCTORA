@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -20,6 +22,7 @@ class NotificacionService extends ChangeNotifier {
 
   WebSocketChannel? _channel;
   StreamSubscription? _wsSubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _reconnectTimer;
   Timer? _pingTimer;
   Timer? _pollTimer;
@@ -27,6 +30,7 @@ class NotificacionService extends ChangeNotifier {
   bool _isConnected = false;
   bool _isConnecting = false;
   bool _manualDisconnect = false;
+  int _reconnectAttempts = 0;
   List<Map<String, dynamic>> _notificaciones = [];
   final Set<int> _notifiedIds = <int>{};
   bool _initialLoadCompleted = false;
@@ -59,9 +63,36 @@ class NotificacionService extends ChangeNotifier {
     _manualDisconnect = false;
     final token = await TokenStorage.getToken();
     if (token == null || token.trim().isEmpty) return;
+    _ensureConnectivityListener();
     await sincronizarSilencioso();
     await _connectWebSocket();
     _startPollingFallback();
+  }
+
+  /// Reconecta y sincroniza inmediatamente cuando la app vuelve a primer plano.
+  Future<void> onAppResumed() async {
+    if (_manualDisconnect) return;
+    final token = await TokenStorage.getToken();
+    if (token == null || token.trim().isEmpty) return;
+    await sincronizarSilencioso();
+    if (!_isConnected && !_isConnecting) {
+      _reconnectAttempts = 0;
+      await _connectWebSocket();
+    }
+  }
+
+  void _ensureConnectivityListener() {
+    if (_connectivitySubscription != null) return;
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (online && !_manualDisconnect) {
+        _reconnectAttempts = 0;
+        unawaited(sincronizarSilencioso());
+        if (!_isConnected && !_isConnecting) {
+          unawaited(_connectWebSocket());
+        }
+      }
+    });
   }
 
   /// Cierra la conexión WebSocket y limpia el estado al cerrar sesión.
@@ -69,6 +100,7 @@ class NotificacionService extends ChangeNotifier {
     _manualDisconnect = true;
     _isConnected = false;
     _isConnecting = false;
+    _reconnectAttempts = 0;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _pingTimer?.cancel();
@@ -77,6 +109,8 @@ class NotificacionService extends ChangeNotifier {
     _pollTimer = null;
     _wsSubscription?.cancel();
     _wsSubscription = null;
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
     try {
       _channel?.sink.close();
     } catch (_) {}
@@ -134,6 +168,7 @@ class NotificacionService extends ChangeNotifier {
 
       _isConnected = true;
       _isConnecting = false;
+      _reconnectAttempts = 0;
       _startPingKeepAlive();
       notifyListeners();
     } catch (_) {
@@ -167,7 +202,9 @@ class NotificacionService extends ChangeNotifier {
   void _scheduleReconnect() {
     if (_manualDisconnect) return;
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 6), () {
+    final delaySec = math.min(30, 3 * (1 << math.min(_reconnectAttempts, 4)));
+    _reconnectAttempts++;
+    _reconnectTimer = Timer(Duration(seconds: delaySec), () {
       if (!_manualDisconnect && !_isConnected) {
         _connectWebSocket();
       }
@@ -394,6 +431,69 @@ class NotificacionService extends ChangeNotifier {
           .toList();
       notifyListeners();
 
+      return Map<String, dynamic>.from(data);
+    } on DioException catch (e) {
+      throw Exception(_parsearErrorDio(e));
+    }
+  }
+
+  /// HU141: Consulta la configuración de alertas por tipo de evento (empresa u obra).
+  Future<Map<String, dynamic>> obtenerConfiguracionAlertas({
+    int? idObra,
+    int? idEmpresa,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (idObra != null) queryParams['id_obra'] = idObra;
+      if (idEmpresa != null) queryParams['id_empresa'] = idEmpresa;
+
+      final response = await ApiClient.dio.get(
+        '$_basePath/configuracion-alertas',
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
+      final data = response.data;
+      if (data is! Map) {
+        throw Exception('Respuesta inválida del servidor.');
+      }
+      if (data['success'] != true) {
+        throw Exception(
+          data['detail'] ?? data['message'] ?? 'No se pudo cargar la configuración de alertas.',
+        );
+      }
+      return Map<String, dynamic>.from(data);
+    } on DioException catch (e) {
+      throw Exception(_parsearErrorDio(e));
+    }
+  }
+
+  /// HU141: Guarda la configuración de alertas por tipo de evento o restablece una obra.
+  Future<Map<String, dynamic>> actualizarConfiguracionAlertas({
+    int? idObra,
+    int? idEmpresa,
+    List<Map<String, dynamic>>? configuraciones,
+    bool restablecerObra = false,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'id_obra': idObra,
+        if (idEmpresa != null) 'id_empresa': idEmpresa,
+        if (restablecerObra) 'restablecer_obra': true,
+        if (!restablecerObra && configuraciones != null)
+          'configuraciones': configuraciones,
+      };
+      final response = await ApiClient.dio.put(
+        '$_basePath/configuracion-alertas',
+        data: payload,
+      );
+      final data = response.data;
+      if (data is! Map) {
+        throw Exception('Respuesta inválida del servidor.');
+      }
+      if (data['success'] != true) {
+        throw Exception(
+          data['detail'] ?? data['message'] ?? 'No se pudo guardar la configuración de alertas.',
+        );
+      }
       return Map<String, dynamic>.from(data);
     } on DioException catch (e) {
       throw Exception(_parsearErrorDio(e));

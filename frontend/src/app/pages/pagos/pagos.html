@@ -6,7 +6,7 @@
         <span class="badge-dot"></span>
         {{ esGlobal ? 'Facturación & Pasarela Stripe' : 'Suscripción & Facturación' }}
       </span>
-      <h1>{{ esGlobal ? 'Pagos SaaS y Transacciones' : 'Pagos y Suscripción' }}</h1>
+      <h1>{{ esGlobal ? 'Pagos y transacciones' : 'Pagos y suscripción' }}</h1>
       <p>
         {{ esGlobal
           ? 'Monitoreo centralizado de cobros de suscripciones, conciliación en tiempo real con Stripe y auditoría de comprobantes.'
@@ -18,8 +18,8 @@
       <a *ngIf="!esGlobal" routerLink="/suscripciones" class="secondary-button">
         Ver detalle de suscripción
       </a>
-      <button *ngIf="esGlobal" type="button" class="secondary-button" (click)="cargarGlobal()" [disabled]="cargando()">
-        {{ cargando() ? 'Actualizando…' : '↻ Actualizar transacciones' }}
+      <button *ngIf="esGlobal" type="button" class="secondary-button" (click)="cargarGlobal(); cargarTransacciones()" [disabled]="cargando() || cargandoTransacciones()">
+        {{ cargando() || cargandoTransacciones() ? 'Actualizando…' : '↻ Actualizar transacciones' }}
       </button>
     </div>
   </header>
@@ -314,6 +314,62 @@
                   Comprobante
                 </button>
               </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ACTIVIDAD DE SUSCRIPCIONES (MOVIMIENTOS Y VENCIMIENTOS POR EMPRESA) -->
+    <section class="admin-dashboard" aria-labelledby="dashboard-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="dashboard-title">Actividad de suscripciones</h2>
+          <p>Compras, renovaciones, cambios de plan, cancelaciones y vencimientos por empresa. Los vencimientos calculados se identifican como tales.</p>
+        </div>
+      </div>
+      <form (ngSubmit)="cargarTransacciones()" class="transaction-filters">
+        <label for="empresa-transacciones">Empresa
+          <input id="empresa-transacciones" name="nombreEmpresa" type="search" maxlength="100"
+            [(ngModel)]="nombreEmpresa" placeholder="Nombre de empresa">
+        </label>
+        <label for="fecha-desde">Desde
+          <input id="fecha-desde" name="fechaDesde" type="date" [(ngModel)]="fechaDesde">
+        </label>
+        <label for="fecha-hasta">Hasta
+          <input id="fecha-hasta" name="fechaHasta" type="date" [(ngModel)]="fechaHasta">
+        </label>
+        <div class="transaction-filter-actions">
+          <button type="submit" class="primary-button" [disabled]="cargandoTransacciones()">
+            {{ cargandoTransacciones() ? 'Buscando...' : 'Buscar' }}
+          </button>
+          <button type="button" class="secondary-button" [disabled]="cargandoTransacciones()" (click)="restablecerFiltros()">Restablecer</button>
+        </div>
+      </form>
+
+      <p *ngIf="cargandoTransacciones()" class="results-count" role="status">Cargando movimientos...</p>
+      <p *ngIf="!cargandoTransacciones() && transacciones().length" class="results-count" role="status">
+        Mostrando {{ transacciones().length }} movimientos recientes (máximo 50).
+      </p>
+      <app-empty-state *ngIf="!cargandoTransacciones() && !transacciones().length" titulo="No hay movimientos"
+        descripcion="Pruebe otro rango de fechas o busque por nombre de empresa."></app-empty-state>
+
+      <div *ngIf="!cargandoTransacciones() && transacciones().length" class="table-wrap">
+        <table>
+          <thead><tr><th>Empresa</th><th>Movimiento</th><th>Plan</th><th>Importe</th><th>Fecha</th><th>Referencia</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let movimiento of transacciones()">
+              <td data-label="Empresa"><strong>{{ movimiento.nombre_empresa }}</strong></td>
+              <td data-label="Movimiento">
+                <span class="event-kind">{{ etiquetaMovimiento(movimiento) }}</span>
+                <small *ngIf="movimiento.es_calculado" class="event-note">Derivado de fecha fin; no es un evento auditado.</small>
+              </td>
+              <td data-label="Plan">{{ movimiento.nombre_plan }}</td>
+              <td data-label="Importe">
+                {{ movimiento.monto_menor !== null && movimiento.moneda ? dinero(movimiento.monto_menor, movimiento.moneda) : '—' }}
+              </td>
+              <td data-label="Fecha">{{ fechaMovimiento(movimiento) }}</td>
+              <td data-label="Referencia">{{ movimiento.id_pago ? 'Pago #' + movimiento.id_pago : 'Historial #' + movimiento.id_historial }}</td>
             </tr>
           </tbody>
         </table>

@@ -7,9 +7,11 @@ import 'package:provider/provider.dart';
 import '../services/auth_provider.dart';
 import '../services/notificacion_service.dart';
 import '../services/obra_service.dart';
+import '../services/offline_sync_service.dart';
 import '../services/empresa_service.dart';
 import '../theme/app_theme.dart';
 import 'asistente_screen.dart';
+import 'cliente_unidades_screen.dart';
 import 'consultas_tecnicas_screen.dart';
 import 'crm_screen.dart';
 import 'incidencias_screen.dart';
@@ -21,6 +23,7 @@ import 'proyectos_screen.dart';
 import 'proyecto_detalle_screen.dart';
 import 'avances_obra_screen.dart';
 import 'reportes_screen.dart';
+import 'sync_status_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -99,9 +102,38 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _cargarObras() async {
     setState(() => _cargando = true);
     try {
-      final lista = await _obraService.listarProyectos();
-      if (!mounted) return;
       final auth = Provider.of<AuthProvider>(context, listen: false);
+      final empId = auth.empresaId;
+      final List<Map<String, dynamic>> lista;
+      if (empId != null && empId > 0 && !auth.esCliente) {
+        final res = await OfflineSyncService.instance.obtenerObrasOfflineFirst(
+          idEmpresa: empId,
+          userKey: auth.userIdentityKey,
+          fetcherRemoto: _obraService.listarProyectos,
+        );
+        lista = res.data;
+        if (!res.esCopiaLocal) {
+          unawaited(
+            OfflineSyncService.instance.precargarTodoOffline(
+              idEmpresa: empId,
+              userKey: auth.userIdentityKey,
+              esCliente: auth.esCliente,
+            ),
+          );
+        }
+      } else {
+        lista = await _obraService.listarProyectos();
+        if (empId != null && empId > 0) {
+          unawaited(
+            OfflineSyncService.instance.precargarTodoOffline(
+              idEmpresa: empId,
+              userKey: auth.userIdentityKey,
+              esCliente: auth.esCliente,
+            ),
+          );
+        }
+      }
+      if (!mounted) return;
 
       List<Map<String, dynamic>> listaFiltrada = lista;
       if (auth.esAdminGlobal && !auth.esVistaGlobal && auth.idEmpresaActiva != null) {
@@ -521,6 +553,57 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          if (!auth.esCliente)
+            ListenableBuilder(
+              listenable: OfflineSyncService.instance,
+              builder: (_, __) {
+                final sync = OfflineSyncService.instance;
+                final badge = sync.pendientesCount + sync.erroresCount;
+                return IconButton(
+                  tooltip: 'Estado de sincronización',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SyncStatusScreen()),
+                    );
+                  },
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        sync.isOnline ? Icons.sync_rounded : Icons.cloud_off_rounded,
+                        size: 22,
+                        color: !sync.isOnline
+                            ? const Color(0xFFD97706)
+                            : (sync.erroresCount > 0 ? const Color(0xFFDC2626) : null),
+                      ),
+                      if (badge > 0)
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: sync.erroresCount > 0
+                                  ? const Color(0xFFDC2626)
+                                  : const Color(0xFFD97706),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$badge',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.search_rounded, size: 22),
             tooltip: 'Buscar proyectos',
@@ -566,6 +649,12 @@ class _HomeScreenState extends State<HomeScreen> {
               // 1. Tarjeta Selector de Empresa (Prototipo Screen 2 y 8)
               _buildCompanySelectorCard(auth, isDark, cardBg, borderColor, titleColor),
               const SizedBox(height: 20),
+
+              // Portal del Cliente (CU30)
+              if (auth.esCliente) ...[
+                _buildClientePortalCard(isDark, cardBg, borderColor, titleColor),
+                const SizedBox(height: 20),
+              ],
 
               // 2. Resumen General (Métricas 2x2)
               Row(
@@ -873,20 +962,124 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildClientePortalCard(
+    bool isDark,
+    Color cardBg,
+    Color borderColor,
+    Color titleColor,
+  ) {
+    final subColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppTheme.primary.withValues(alpha: isDark ? 0.35 : 0.45),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primary.withValues(alpha: isDark ? 0.12 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ClienteUnidadesScreen()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: isDark ? 0.22 : 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.home_work_rounded,
+                    color: AppTheme.primary,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Mis Proyectos y Unidades',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: titleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Accede a tus proyectos y unidades asociadas como cliente.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: subColor,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: AppTheme.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuickAccessGrid(
     bool isDark,
     Color cardBg,
     Color borderColor,
     Color titleColor,
   ) {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 3,
       mainAxisSpacing: 10,
       crossAxisSpacing: 10,
-      childAspectRatio: 1.05,
+      childAspectRatio: 0.92,
       children: [
+        if (auth.esCliente)
+          _buildQuickAccessItem(
+            icon: Icons.home_work_rounded,
+            iconColor: AppTheme.primary,
+            label: 'Mis Proyectos y Unidades',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ClienteUnidadesScreen()),
+            ),
+            isDark: isDark,
+            cardBg: cardBg,
+            borderColor: borderColor,
+            titleColor: titleColor,
+          ),
         _buildQuickAccessItem(
           icon: Icons.apartment_rounded,
           iconColor: AppTheme.primary,
@@ -1013,7 +1206,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(12),
@@ -1030,17 +1223,20 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Icon(icon, color: iconColor, size: 22),
             ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: titleColor,
+            const SizedBox(height: 6),
+            Flexible(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: titleColor,
+                  height: 1.15,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
